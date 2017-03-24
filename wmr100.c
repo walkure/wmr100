@@ -27,6 +27,11 @@
 #include <sys/time.h>
 #include <assert.h>
 
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+
 #define WMR100_VENDOR_ID  0x0fde
 #define WMR100_PRODUCT_ID 0xca01
 
@@ -38,6 +43,7 @@
 
 bool gOutputStdout = false;
 bool gOutputFile = false;
+bool gOutputUdp = false;
 
 /* Constants */
 
@@ -65,6 +71,7 @@ typedef struct _WMR {
     HIDInterface *hid;
     FILE *data_fh;
     char *data_filename;
+    int socket;
 } WMR;
 
 WMR *wmr = NULL;
@@ -96,6 +103,7 @@ WMR *wmr_new(){
     }
     wmr->data_fh = NULL;
     wmr->data_filename = "./data.log";
+    wmr->socket = -1;
     return wmr;
 }
 
@@ -195,6 +203,11 @@ int wmr_close(WMR *wmr){
         fclose(wmr->data_fh);
         wmr->data_fh = NULL;
     }
+
+    if (wmr->socket >= 0){
+	close(wmr->socket);
+	wmr->socket = -1;
+    }
     return 0;
 }
 
@@ -266,6 +279,25 @@ void wmr_output_stdout(WMR *wmr, char *msg) {
     fflush(stdout);
 }
 
+void wmr_output_udp(WMR *wmr,char *msg){
+    struct sockaddr_in addr;
+
+    if(wmr->socket < 0){
+	int sock;
+
+	sock = socket(AF_INET, SOCK_DGRAM, 0);
+	if(sock < 0){
+	    fprintf(stderr, "ERROR:cannot create socket\n");
+	    return;
+	}
+	wmr->socket = sock;
+    }
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(13254);
+    addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+    sendto(wmr->socket, msg, strlen(msg)+1, 0, (struct sockaddr *)&addr, sizeof(addr) );
+}
+
 void wmr_log_data(WMR *wmr, char *topic, char *msg) {
     char timestamp[200];
     char *buf;
@@ -290,6 +322,9 @@ void wmr_log_data(WMR *wmr, char *topic, char *msg) {
     }
     if (gOutputStdout) {
         wmr_output_stdout(wmr, buf);
+    }
+    if (gOutputUdp) {
+	wmr_output_udp(wmr, buf);
     }
 
     free(buf);
@@ -601,14 +636,15 @@ int main(int argc, char* argv[]) {
     signal(SIGTERM, cleanup);
 
     /* Parse the command line parameters */
-    while ((c = getopt(argc, argv, "hsfd:")) != -1)
+    while ((c = getopt(argc, argv, "hsfu")) != -1)
     {
         switch (c)
         {
         case 'h':
             fprintf(stderr, "Options:\n"
                 "\t-s: output to sdtout only\n"
-                "\t-f: output to file only\n");
+                "\t-f: output to file only\n"
+                "\t-u: output to udp only\n");
             return 1;
         case 's':
             gOutputStdout = true;
@@ -616,6 +652,9 @@ int main(int argc, char* argv[]) {
         case 'f':
             gOutputFile = true;
             break;
+	case 'u':
+	    gOutputUdp = true;
+	    break;
         case '?':
             if (isprint(optopt))
                 fprintf(stderr, "Unknown option `-%c'.\n", optopt);
@@ -625,10 +664,11 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    if (!(gOutputStdout || gOutputFile)) {
+    if (!(gOutputStdout || gOutputFile || gOutputUdp)) {
         /* set default outputs */
         gOutputStdout = true;
         gOutputFile = true;
+	gOutputUdp = false;
     }
 
     /* Initialize WMR */
@@ -643,6 +683,8 @@ int main(int argc, char* argv[]) {
         fprintf(stderr, "- Stdout\n");
     if (gOutputFile)
         fprintf(stderr, "- File\n");
+    if (gOutputUdp)
+        fprintf(stderr, "- Udp\n");
 
     fprintf(stderr, "Opening WMR100...\n");
     ret = wmr_init(wmr);
