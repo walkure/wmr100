@@ -29,8 +29,7 @@
 
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
+#include <sys/un.h>
 
 #define WMR100_VENDOR_ID  0x0fde
 #define WMR100_PRODUCT_ID 0xca01
@@ -280,21 +279,20 @@ void wmr_output_stdout(WMR *wmr, char *msg) {
 }
 
 void wmr_output_udp(WMR *wmr,char *msg){
-    struct sockaddr_in addr;
+    struct sockaddr_un addr;
 
     if(wmr->socket < 0){
 	int sock;
 
-	sock = socket(AF_INET, SOCK_DGRAM, 0);
+	sock = socket(AF_UNIX, SOCK_DGRAM, 0);
 	if(sock < 0){
 	    fprintf(stderr, "ERROR:cannot create socket\n");
 	    return;
 	}
 	wmr->socket = sock;
     }
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons(13254);
-    addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+    addr.sun_family = AF_UNIX;
+	strcpy(addr.sun_path,"/tmp/wmr100.sock");
     sendto(wmr->socket, msg, strlen(msg)+1, 0, (struct sockaddr *)&addr, sizeof(addr) );
 }
 
