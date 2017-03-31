@@ -19,6 +19,7 @@
 
 #include <hid.h>
 #include <stdio.h>
+#include <stddef.h>
 #include <string.h>
 #include <signal.h>
 #include <time.h>
@@ -293,7 +294,8 @@ void wmr_output_udp(WMR *wmr,char *msg){
     }
     addr.sun_family = AF_UNIX;
 	strcpy(addr.sun_path,"/tmp/wmr100.sock");
-    sendto(wmr->socket, msg, strlen(msg)+1, 0, (struct sockaddr *)&addr, sizeof(addr) );
+	addr.sun_path[0]=0;
+	sendto(wmr->socket, msg, strlen(msg)+1, 0, (struct sockaddr *)&addr, offsetof(struct sockaddr_un, sun_path) + strlen(&addr.sun_path[1]) + 1);
 }
 
 void wmr_log_data(WMR *wmr, char *topic, char *msg) {
@@ -666,7 +668,7 @@ int main(int argc, char* argv[]) {
         /* set default outputs */
         gOutputStdout = true;
         gOutputFile = true;
-	gOutputUdp = false;
+        gOutputUdp = false;
     }
 
     /* Initialize WMR */
