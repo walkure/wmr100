@@ -283,19 +283,19 @@ void wmr_output_udp(WMR *wmr,char *msg){
     struct sockaddr_un addr;
 
     if(wmr->socket < 0){
-	int sock;
+        int sock;
 
-	sock = socket(AF_UNIX, SOCK_DGRAM, 0);
-	if(sock < 0){
-	    fprintf(stderr, "ERROR:cannot create socket\n");
-	    return;
-	}
-	wmr->socket = sock;
+        sock = socket(AF_UNIX, SOCK_DGRAM, 0);
+        if(sock < 0){
+            fprintf(stderr, "ERROR:cannot create socket\n");
+            return;
+        }
+        wmr->socket = sock;
     }
     addr.sun_family = AF_UNIX;
-	strcpy(addr.sun_path,"/tmp/wmr100.sock");
-	addr.sun_path[0]=0;
-	sendto(wmr->socket, msg, strlen(msg)+1, 0, (struct sockaddr *)&addr, offsetof(struct sockaddr_un, sun_path) + strlen(&addr.sun_path[1]) + 1);
+    strcpy(addr.sun_path,"/tmp/wmr100.sock");
+    addr.sun_path[0]=0;
+    sendto(wmr->socket, msg, strlen(msg)+1, 0, (struct sockaddr *)&addr, offsetof(struct sockaddr_un, sun_path) + strlen(&addr.sun_path[1]) + 1);
 }
 
 void wmr_log_data(WMR *wmr, char *topic, char *msg) {
